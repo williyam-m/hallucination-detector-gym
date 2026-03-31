@@ -70,7 +70,8 @@ LLM hallucinations — factual errors, fabricated entities, and logical inconsis
 | `hallucination_detector_gym/rewards.py` | Dense reward computation with partial progress |
 | `hallucination_detector_gym/graders.py` | Deterministic graders scoring 0.0→1.0 |
 | `server/hallucination_environment.py` | OpenEnv Environment with step()/reset()/state() |
-| `server/app.py` | FastAPI application wiring |
+| `server/app.py` | FastAPI application wiring + custom Gradio mount |
+| `server/gradio_builder.py` | Custom Gradio UI with rich observation display |
 | `inference.py` | Baseline agent using OpenAI API |
 
 ### Data Flow
@@ -105,14 +106,14 @@ Agent                     Environment
 
 ### Action Space (`HallucinationAction`)
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `action_type` | `"detect"` \| `"classify"` \| `"correct"` \| `"submit"` \| `"noop"` | ✅ | Action to perform |
-| `hallucination_detected` | `bool` | For `detect` | Whether a hallucination was found |
-| `hallucination_type` | `"factual_error"` \| `"entity_fabrication"` \| `"logical_inconsistency"` \| `"none"` | For `classify` | Hallucination category |
-| `hallucinated_span` | `string` | Recommended | Exact text from passage that is hallucinated |
-| `corrected_text` | `string` | For `correct` | Proposed fix |
-| `reasoning` | `string` | Optional | Chain-of-thought |
+| Field | Type | UI Widget | Required | Description |
+|---|---|---|---|---|
+| `action_type` | `"detect"` \| `"classify"` \| `"correct"` \| `"submit"` \| `"noop"` | Dropdown | ✅ | Action to perform |
+| `hallucination_detected` | `bool` | Checkbox ✅ | For `detect` | Whether a hallucination was found |
+| `hallucination_type` | `"factual_error"` \| `"entity_fabrication"` \| `"logical_inconsistency"` \| `"none"` | Dropdown | For `classify` | Hallucination category |
+| `hallucinated_span` | `string` | Textarea | Recommended | Exact text from passage that is hallucinated |
+| `corrected_text` | `string` | Textarea | For `correct` | Proposed fix |
+| `reasoning` | `string` | Textarea | Optional | Chain-of-thought |
 
 ### Observation Space (`HallucinationObservation`)
 
@@ -195,6 +196,25 @@ cp .env.example .env
 ```
 
 See [`.env.example`](.env.example) for all available configuration options.
+
+
+### Web Interface (Gradio UI)
+
+When deployed to Hugging Face Spaces (or run locally with `ENABLE_WEB_INTERFACE=true`), the environment provides a **custom Gradio web UI** at `/web` with:
+
+- 🔽 **Dropdowns** for `action_type` and `hallucination_type`
+- ✅ **Checkbox** for `hallucination_detected`
+- 📝 **Multi-line textareas** for `hallucinated_span`, `corrected_text`, and `reasoning`
+- 📄 **Rich observation display** — passage, source context, reward, feedback, and action history rendered as formatted Markdown
+- 🗺️ **Workflow guide** — step-by-step instructions in the sidebar
+- 🚀 **Quick Start** panel with connection code snippets
+
+To enable locally:
+
+```bash
+ENABLE_WEB_INTERFACE=true uvicorn server.app:app --reload --host 0.0.0.0 --port 8000
+# Then open http://localhost:8000/web
+```
 
 
 ### Local Development
@@ -390,6 +410,7 @@ hallucination-detector-gym/
 ├── server/                               # OpenEnv server
 │   ├── __init__.py
 │   ├── app.py                            # FastAPI application (OpenEnv create_app)
+│   ├── gradio_builder.py                 # Custom Gradio web UI (replaces generic UI)
 │   ├── hallucination_environment.py      # Environment implementation
 │   └── requirements.txt                  # Server dependencies
 │

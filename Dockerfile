@@ -73,6 +73,9 @@ ENV PYTHONPATH="/app/env:$PYTHONPATH"
 # Disable Python output buffering
 ENV PYTHONUNBUFFERED=1
 
+# Enable the custom Gradio web interface
+ENV ENABLE_WEB_INTERFACE=true
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
