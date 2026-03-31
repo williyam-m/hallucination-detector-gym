@@ -47,6 +47,7 @@ except ModuleNotFoundError:  # pragma: no cover
     from server.hallucination_environment import HallucinationDetectorEnvironment
 
 from hallucination_detector_gym.logging_config import configure_logging
+from server.gradio_builder import build_hallucination_gradio_app
 
 # ── Configure structured logging on import ───────────────────────────────────
 configure_logging(json_output=True, log_level="INFO")
@@ -58,6 +59,7 @@ app = create_app(
     HallucinationObservation,
     env_name="hallucination_detector_gym",
     max_concurrent_envs=1,  # increase to allow more concurrent WebSocket sessions
+    gradio_builder=build_hallucination_gradio_app,
 )
 
 

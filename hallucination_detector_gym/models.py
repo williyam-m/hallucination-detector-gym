@@ -30,20 +30,26 @@ HallucinationTypeLiteral = Literal[
 
 
 def _flatten_enum_from_anyof(schema: Dict[str, Any]) -> None:
-    """Post-process JSON schema: lift ``enum`` out of ``anyOf`` wrappers.
+    """Post-process JSON schema for OpenEnv Gradio UI compatibility.
 
-    The OpenEnv Gradio UI reads ``field_info.get("enum")`` at the top level
-    of each property to decide whether to render a dropdown.  Pydantic v2
-    puts ``enum`` inside ``anyOf`` for ``Optional[Literal[...]]`` fields,
-    so this helper copies it up so the UI can discover it.
+    The OpenEnv Gradio UI inspects top-level property keys to decide widget
+    types:
+      • ``"enum"``            → ``gr.Dropdown``
+      • ``"type": "boolean"`` → ``gr.Checkbox``
+      • ``maxLength > 100``   → ``gr.Textbox(lines=3)``  (textarea)
 
-    Also resolves ``$ref`` to ``$defs`` entries so enum values are always
-    available inline on each property.
+    Pydantic v2 wraps ``Optional[...]`` fields in ``anyOf`` and uses
+    ``$ref`` for enum types, hiding both signals.  This helper promotes
+    them to the top level so the UI renders the correct widgets.
+
+    It also injects a ``"x-ui-widget"`` hint (ignored by OpenEnv core
+    but available for custom UIs) and reorders properties for a logical
+    action-building flow.
     """
     defs = schema.get("$defs", {})
 
-    for prop in schema.get("properties", {}).values():
-        # Resolve $ref → inline enum
+    for _name, prop in schema.get("properties", {}).items():
+        # ── Resolve $ref → inline enum ───────────────────────────────────
         if "$ref" in prop and "enum" not in prop:
             ref_path = prop["$ref"]  # e.g. "#/$defs/ActionType"
             ref_name = ref_path.rsplit("/", 1)[-1]
@@ -51,20 +57,58 @@ def _flatten_enum_from_anyof(schema: Dict[str, Any]) -> None:
             if "enum" in ref_def:
                 prop["enum"] = ref_def["enum"]
 
-        # Lift enum from anyOf (for Optional[Literal[...]])
-        if "anyOf" in prop and "enum" not in prop:
+        # ── Lift enum + type from anyOf (for Optional[Literal[...]] etc) ─
+        if "anyOf" in prop:
             for variant in prop["anyOf"]:
-                # Direct enum in variant
-                if "enum" in variant:
+                # Skip the null variant
+                if variant.get("type") == "null":
+                    continue
+
+                # Promote enum
+                if "enum" not in prop and "enum" in variant:
                     prop["enum"] = variant["enum"]
-                    break
-                # $ref inside anyOf
-                if "$ref" in variant:
+
+                # Promote type (e.g. "boolean", "integer", "number", "string")
+                if "type" not in prop and "type" in variant:
+                    prop["type"] = variant["type"]
+
+                # Promote maxLength (triggers textarea in Gradio UI)
+                if "maxLength" not in prop and "maxLength" in variant:
+                    prop["maxLength"] = variant["maxLength"]
+
+                # Promote minLength
+                if "minLength" not in prop and "minLength" in variant:
+                    prop["minLength"] = variant["minLength"]
+
+                # Resolve $ref inside anyOf
+                if "enum" not in prop and "$ref" in variant:
                     ref_name = variant["$ref"].rsplit("/", 1)[-1]
                     ref_def = defs.get(ref_name, {})
                     if "enum" in ref_def:
                         prop["enum"] = ref_def["enum"]
-                        break
+
+    # ── Reorder properties for a logical action-building flow ────────────
+    # The Gradio UI renders fields in iteration order — put the most
+    # important fields first so the user fills them top-to-bottom.
+    desired_order = [
+        "action_type",
+        "hallucination_detected",
+        "hallucination_type",
+        "hallucinated_span",
+        "corrected_text",
+        "reasoning",
+        "metadata",
+    ]
+    props = schema.get("properties", {})
+    ordered: Dict[str, Any] = {}
+    for key in desired_order:
+        if key in props:
+            ordered[key] = props[key]
+    # Append any remaining fields not in the desired order
+    for key, val in props.items():
+        if key not in ordered:
+            ordered[key] = val
+    schema["properties"] = ordered
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -85,30 +129,63 @@ class HallucinationAction(BaseAction):
 
     action_type: ActionTypeLiteral = Field(
         default="noop",
+        title="Action Type",
         description=(
-            "The type of action to perform: detect, classify, correct, submit, or noop. "
-            "Defaults to 'noop' if omitted."
+            "Choose an action: "
+            "① detect → flag hallucinations, "
+            "② classify → label their type, "
+            "③ correct → propose a fix, "
+            "④ submit → finalise, "
+            "⑤ noop → skip this step."
         ),
     )
     hallucination_detected: Optional[bool] = Field(
         default=None,
-        description="Whether the agent believes a hallucination exists in the current passage.",
+        title="Hallucination Detected",
+        description=(
+            "✅ Check this box if the passage contains a hallucination. "
+            "Leave unchecked if the passage is accurate. "
+            "Required when Action Type is 'detect'."
+        ),
     )
     hallucination_type: Optional[HallucinationTypeLiteral] = Field(
         default=None,
-        description="The category of hallucination (required for 'classify' action).",
+        title="Hallucination Type",
+        description=(
+            "Select the hallucination category (required for 'classify'): "
+            "factual_error → wrong fact, "
+            "entity_fabrication → invented entity, "
+            "logical_inconsistency → self-contradicting, "
+            "none → no hallucination."
+        ),
     )
     hallucinated_span: Optional[str] = Field(
         default=None,
-        description="The exact substring the agent considers hallucinated.",
+        title="Hallucinated Span",
+        max_length=500,
+        description=(
+            "Copy-paste the exact hallucinated substring from the passage. "
+            "Better span overlap → higher reward. "
+            "Used with detect, classify, and correct actions."
+        ),
     )
     corrected_text: Optional[str] = Field(
         default=None,
-        description="The agent's proposed correction for the hallucinated span.",
+        title="Corrected Text",
+        max_length=500,
+        description=(
+            "Your proposed factually-correct replacement for the hallucinated span. "
+            "Required when Action Type is 'correct'."
+        ),
     )
     reasoning: Optional[str] = Field(
         default=None,
-        description="Optional chain-of-thought reasoning the agent provides.",
+        title="Reasoning (optional)",
+        max_length=2000,
+        description=(
+            "Optional chain-of-thought explanation. "
+            "Not scored, but helps with debugging and interpretability."
+        ),
     )
 
     # ── Validators: coerce Literal strings → Enum instances ──────────────────
