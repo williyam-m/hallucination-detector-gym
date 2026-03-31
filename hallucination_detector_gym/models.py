@@ -34,7 +34,11 @@ class HallucinationAction(BaseAction):
     """
 
     action_type: ActionType = Field(
-        description="The type of action to perform."
+        default=ActionType.NOOP,
+        description=(
+            "The type of action to perform: detect, classify, correct, submit, or noop. "
+            "Defaults to 'noop' if omitted."
+        ),
     )
     hallucination_detected: Optional[bool] = Field(
         default=None,

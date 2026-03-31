@@ -155,11 +155,20 @@ class HallucinationDetectorEnvironment(Environment):
                 metadata={"error": "episode_already_done"},
             )
 
-        # Cast to typed action
-        if isinstance(action, HallucinationAction):
-            typed_action = action
-        else:
-            typed_action = HallucinationAction(**action.model_dump())
+        # Cast to typed action — handle malformed input gracefully
+        try:
+            if isinstance(action, HallucinationAction):
+                typed_action = action
+            elif isinstance(action, dict):
+                typed_action = HallucinationAction(**action)
+            else:
+                typed_action = HallucinationAction(**action.model_dump())
+        except Exception as exc:
+            logger.warning("malformed_action", error=str(exc))
+            typed_action = HallucinationAction(
+                action_type=ActionType.NOOP,
+                reasoning=f"Malformed action received: {exc}",
+            )
 
         # Increment step
         self._state.step_count += 1
