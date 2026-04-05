@@ -335,3 +335,115 @@ class TestGrader:
             HallucinationAction(action_type=ActionType.SUBMIT),
         ])
         assert 0.0 <= score <= 1.0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Anti-Exploitation Tests
+# ──────────────────────────────────────────────────────────────────────────────
+class TestAntiExploitation:
+    """Tests for reward deduplication and anti-gaming measures."""
+
+    def test_detect_double_counting_blocked(self) -> None:
+        """Same detection action repeated should not award span bonus twice."""
+        engine = RewardEngine(TASK_EASY)
+        action = HallucinationAction(
+            action_type=ActionType.DETECT,
+            hallucination_detected=True,
+            hallucinated_span="Munich, Germany",
+        )
+        r1, f1 = engine.compute_reward(action)
+        r2, f2 = engine.compute_reward(action)
+        # First detection gets full reward, second gets base detection but no span bonus
+        assert r1 > r2
+        assert "already been detected" in f2.lower()
+
+    def test_classify_double_counting_blocked(self) -> None:
+        """Same classification repeated should not award twice."""
+        engine = RewardEngine(TASK_EASY)
+        action = HallucinationAction(
+            action_type=ActionType.CLASSIFY,
+            hallucination_type=HallucinationType.FACTUAL_ERROR,
+            hallucinated_span="Munich, Germany",
+        )
+        r1, _ = engine.compute_reward(action)
+        r2, f2 = engine.compute_reward(action)
+        assert r1 > 0
+        assert r2 == 0.0 or "already been classified" in f2.lower()
+
+    def test_correct_double_counting_blocked(self) -> None:
+        """Same correction repeated should not award twice."""
+        engine = RewardEngine(TASK_EASY)
+        action = HallucinationAction(
+            action_type=ActionType.CORRECT,
+            hallucinated_span="Munich, Germany",
+            corrected_text="Ulm, in the Kingdom of Württemberg in the German Empire",
+        )
+        r1, _ = engine.compute_reward(action)
+        r2, f2 = engine.compute_reward(action)
+        assert r1 > 0
+        assert r2 == 0.0 or "already been corrected" in f2.lower()
+
+    def test_step_efficiency_bonus(self) -> None:
+        """Submit action should award efficiency bonus for early finish."""
+        engine = RewardEngine(TASK_EASY)
+        submit = HallucinationAction(action_type=ActionType.SUBMIT)
+        reward, feedback = engine.compute_reward(submit)
+        assert reward > 0
+        assert "efficiency" in feedback.lower() or "bonus" in feedback.lower()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Environment Lifecycle Tests
+# ──────────────────────────────────────────────────────────────────────────────
+class TestEnvironmentLifecycle:
+    """Tests for the HallucinationDetectorEnvironment class."""
+
+    def test_reset_produces_clean_state(self) -> None:
+        """Reset should produce a fresh environment state."""
+        from server.hallucination_environment import HallucinationDetectorEnvironment
+        env = HallucinationDetectorEnvironment()
+        obs = env.reset(task_id="task_easy_factual")
+        assert obs.done is False
+        assert obs.reward == 0.0
+        assert obs.passage is not None
+        assert obs.source_context is not None
+        assert env.state.step_count == 0
+
+    def test_step_without_reset_returns_error(self) -> None:
+        """Step before reset should return done=True with error."""
+        from server.hallucination_environment import HallucinationDetectorEnvironment
+        env = HallucinationDetectorEnvironment()
+        obs = env.step(HallucinationAction(action_type=ActionType.NOOP))
+        assert obs.done is True
+        assert "not reset" in (obs.step_feedback or "").lower()
+
+    def test_full_episode_lifecycle(self) -> None:
+        """Full detect-classify-correct-submit episode should work."""
+        from server.hallucination_environment import HallucinationDetectorEnvironment
+        env = HallucinationDetectorEnvironment()
+        env.reset(task_id="task_easy_factual")
+
+        obs = env.step(HallucinationAction(
+            action_type=ActionType.DETECT,
+            hallucination_detected=True,
+            hallucinated_span="Munich, Germany",
+        ))
+        assert obs.done is False
+        assert obs.reward > 0
+
+        obs = env.step(HallucinationAction(
+            action_type=ActionType.CLASSIFY,
+            hallucination_type=HallucinationType.FACTUAL_ERROR,
+            hallucinated_span="Munich, Germany",
+        ))
+        assert obs.done is False
+
+        obs = env.step(HallucinationAction(
+            action_type=ActionType.CORRECT,
+            hallucinated_span="Munich, Germany",
+            corrected_text="Ulm, in the Kingdom of Württemberg",
+        ))
+        assert obs.done is False
+
+        obs = env.step(HallucinationAction(action_type=ActionType.SUBMIT))
+        assert obs.done is True
