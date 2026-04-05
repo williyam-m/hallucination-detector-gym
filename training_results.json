@@ -1,0 +1,39 @@
+{
+  "model": "Qwen/Qwen3-0.6B",
+  "method": "GRPO (Group Relative Policy Optimization)",
+  "training_date": "2026-04-01T14:15:05.910588",
+  "training_duration_seconds": 42741.81,
+  "device": "mps",
+  "lora_rank": 16,
+  "lora_alpha": 32,
+  "num_generations": 2,
+  "beta": 0.04,
+  "epochs": 3,
+  "learning_rate": 5e-06,
+  "baseline_results": {
+    "task_easy_factual": {
+      "score": 0.2
+    },
+    "task_medium_entity": {
+      "score": 0.225
+    },
+    "task_hard_multi": {
+      "score": 0.8333
+    }
+  },
+  "baseline_average": 0.4194,
+  "grpo_results": {
+    "task_easy_factual": {
+      "score": 0.8
+    },
+    "task_medium_entity": {
+      "score": 0.225
+    },
+    "task_hard_multi": {
+      "score": 0.8333
+    }
+  },
+  "grpo_average": 0.6194,
+  "improvement": 0.2,
+  "improvement_pct": 47.7
+}
