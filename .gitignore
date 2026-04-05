@@ -45,4 +45,5 @@ Thumbs.db
 # Model weights (already on HuggingFace)
 grpo_output/checkpoint-*/
 grpo_output/final/adapter_model.safetensors
+grpo_output/final/tokenizer.json
 grpo_output/final/training_args.bin
