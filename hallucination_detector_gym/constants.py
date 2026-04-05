@@ -22,7 +22,7 @@ ENV_DESCRIPTION: Final[str] = (
 # ──────────────────────────────────────────────────────────────────────────────
 # Episode Configuration
 # ──────────────────────────────────────────────────────────────────────────────
-MAX_STEPS_PER_EPISODE: Final[int] = 10
+MAX_STEPS_PER_EPISODE: Final[int] = 12
 DEFAULT_SEED: Final[int] = 42
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -36,6 +36,9 @@ PENALTY_WRONG_DETECTION: Final[float] = -0.15
 PENALTY_WRONG_CLASSIFICATION: Final[float] = -0.10
 PENALTY_NOOP_WHEN_HALLUCINATION: Final[float] = -0.05
 PENALTY_REPEATED_ACTION: Final[float] = -0.05
+
+# Step efficiency bonus (awarded at submit for finishing early)
+BONUS_STEP_EFFICIENCY: Final[float] = 0.10
 
 # Grader score bounds
 GRADER_SCORE_MIN: Final[float] = 0.0
