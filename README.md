@@ -381,6 +381,76 @@ Scores are from the baseline inference agent using Llama-3.3-70B-Instruct:
 
 ---
 
+## 🏆 Training Results — GRPO Fine-Tuning
+
+We fine-tuned **Qwen3-0.6B** using **GRPO (Group Relative Policy Optimization)** from the TRL library to improve hallucination detection performance.
+
+### Why GRPO?
+GRPO eliminates the need for a separate critic/value model — it estimates the baseline from **group scores** of multiple sampled outputs. This makes it:
+- **Memory efficient** — no critic model needed (unlike PPO)
+- **Low variance** — group-relative baseline (unlike REINFORCE)
+- **High quality** — multi-sample ranking produces strong gradients
+
+### Training Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| **Base Model** | `Qwen/Qwen3-0.6B` (Apache 2.0, ungated) |
+| **Method** | GRPO + LoRA |
+| **LoRA Rank** | 16 (~1.5M trainable params) |
+| **GRPO Generations** | 2 completions per prompt |
+| **KL Beta** | 0.04 |
+| **Learning Rate** | 5e-6 (cosine schedule) |
+| **Epochs** | 3 |
+| **Reward Functions** | 3 (format, detection, correction) |
+| **Thinking Mode** | `enable_thinking=False` (structured JSON output) |
+
+### Training Results
+
+![Training Results](assets/training_results.png)
+
+*Left: Per-task score comparison before and after GRPO. Right: Average score improvement.*
+
+### Training Loss Curve
+
+![Training Loss](assets/training_loss.png)
+
+*GRPO training loss decreasing over training steps.*
+
+### Score Heatmap
+
+![Score Heatmap](assets/score_heatmap.png)
+
+*Heatmap comparing baseline and GRPO scores across all difficulty levels.*
+
+### Reward Functions
+
+The GRPO trainer uses 3 weighted reward signals from the gym's `RewardEngine`:
+
+| Reward | Weight | Measures |
+|--------|--------|----------|
+| `reward_format` | 1.0 | Valid JSON output with correct fields |
+| `reward_detection` | 2.0 | Hallucination detection + span overlap + type match |
+| `reward_correction` | 1.5 | Correction quality + span identification |
+
+### Training Notebook
+
+The full GRPO training pipeline is in [`training_hallucination_detector.ipynb`](training_hallucination_detector.ipynb):
+- Complete dataset construction from gym tasks
+- Qwen3-0.6B + LoRA loading (ungated, Apache 2.0)
+- `enable_thinking=False` for structured JSON output
+- 3-reward GRPO training loop
+- Pre/post evaluation on all tasks
+- Publication-quality visualizations
+- Model push to Hugging Face
+
+### Trained Model
+
+The GRPO-fine-tuned LoRA adapter is published on Hugging Face:
+🔗 [williyam/hallucination-detector-agent-qwen3-0.6b](https://huggingface.co/williyam/hallucination-detector-agent-qwen3-0.6b)
+
+---
+
 ## 📁 Project Structure
 
 ```
@@ -397,6 +467,17 @@ hallucination-detector-gym/
 ├── inference.py                          # Baseline inference script
 ├── client.py                             # OpenEnv EnvClient wrapper
 ├── README.md                             # This file
+├── training_hallucination_detector.ipynb # 🏋️ GRPO fine-tuning notebook
+├── training_results.json                 # Training metrics & scores
+├── model_card.md                         # HuggingFace model card
+│
+├── assets/                               # Training plots & images
+│   ├── training_results.png              # Before/after score comparison
+│   ├── training_loss.png                 # GRPO training loss curve
+│   └── score_heatmap.png                 # Baseline vs GRPO heatmap
+│
+├── grpo_output/                          # GRPO training outputs
+│   └── final/                            # LoRA adapter weights
 │
 ├── hallucination_detector_gym/           # Core library
 │   ├── __init__.py                       # Package exports
