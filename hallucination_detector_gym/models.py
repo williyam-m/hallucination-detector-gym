@@ -131,32 +131,23 @@ class HallucinationAction(BaseAction):
         default="noop",
         title="Action Type",
         description=(
-            "Choose an action: "
-            "① detect → flag hallucinations, "
-            "② classify → label their type, "
-            "③ correct → propose a fix, "
-            "④ submit → finalise, "
-            "⑤ noop → skip this step."
+            "Choose: detect (flag hallucinations), classify (label type), "
+            "correct (propose fix), submit (finalise), noop (skip)."
         ),
     )
     hallucination_detected: Optional[bool] = Field(
         default=None,
         title="Hallucination Detected",
         description=(
-            "✅ Check this box if the passage contains a hallucination. "
-            "Leave unchecked if the passage is accurate. "
-            "Required when Action Type is 'detect'."
+            "Check if the passage contains a hallucination. "
+            "Required for 'detect' action."
         ),
     )
     hallucination_type: Optional[HallucinationTypeLiteral] = Field(
         default=None,
         title="Hallucination Type",
         description=(
-            "Select the hallucination category (required for 'classify'): "
-            "factual_error → wrong fact, "
-            "entity_fabrication → invented entity, "
-            "logical_inconsistency → self-contradicting, "
-            "none → no hallucination."
+            "Hallucination category. Required for 'classify' action."
         ),
     )
     hallucinated_span: Optional[str] = Field(
@@ -164,9 +155,7 @@ class HallucinationAction(BaseAction):
         title="Hallucinated Span",
         max_length=500,
         description=(
-            "Copy-paste the exact hallucinated substring from the passage. "
-            "Better span overlap → higher reward. "
-            "Used with detect, classify, and correct actions."
+            "Exact hallucinated text from the passage. Better overlap = higher reward."
         ),
     )
     corrected_text: Optional[str] = Field(
@@ -174,8 +163,7 @@ class HallucinationAction(BaseAction):
         title="Corrected Text",
         max_length=500,
         description=(
-            "Your proposed factually-correct replacement for the hallucinated span. "
-            "Required when Action Type is 'correct'."
+            "Factually-correct replacement. Required for 'correct' action."
         ),
     )
     reasoning: Optional[str] = Field(
@@ -183,8 +171,7 @@ class HallucinationAction(BaseAction):
         title="Reasoning (optional)",
         max_length=2000,
         description=(
-            "Optional chain-of-thought explanation. "
-            "Not scored, but helps with debugging and interpretability."
+            "Optional chain-of-thought explanation. Not scored."
         ),
     )
 
