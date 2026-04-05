@@ -17,21 +17,37 @@ pinned: false
 short_description: OpenEnv RL env for LLM hallucination detection
 ---
 
-# 🔍 Hallucination Detector Gym
+# Hallucination Detector Gym
 
 An **OpenEnv** environment where AI agents learn to detect, classify, and correct hallucinations in LLM-generated text. Built for the [Meta × OpenEnv × Hugging Face × PyTorch Hackathon](https://www.scaler.com/school-of-technology/meta-pytorch-hackathon).
 
+**Links:**
+- [HF Space (Live Demo)](https://huggingface.co/spaces/williyam/hallucination-detector-gym)
+- [Fine-tuned Qwen3-0.6B Model](https://huggingface.co/williyam/hallucination-detector-agent-qwen3-0.6b)
+- [Architecture Documentation](documentation/architecture.md)
+- [API Reference](documentation/api_reference.md)
+- [Reward Design](documentation/reward_design.md)
+
 ---
 
-## 🎯 Why This Matters
+## Why This Matters
 
-LLM hallucinations — factual errors, fabricated entities, and logical inconsistencies — are one of the biggest barriers to deploying AI in production. This environment trains RL agents to be **automated hallucination auditors**, a task humans actually do every day in content moderation, fact-checking, and AI safety.
+LLM hallucinations — factual errors, fabricated entities, and logical inconsistencies — are one of the biggest barriers to deploying AI in production. According to research, up to **27% of LLM-generated facts** can be hallucinated in open-domain tasks. Content moderators, fact-checkers, and AI safety teams manually verify LLM outputs every day.
 
-**Real-world utility**: Content moderators, fact-checkers, and AI safety teams manually verify LLM outputs. This environment provides a standardised benchmark for training and evaluating agents that automate this process.
+This environment trains RL agents to be **automated hallucination auditors** — a task with direct production value:
+
+| Real-World Application | Current Cost | Agent Benefit |
+|----------------------|-------------|---------------|
+| Content moderation at scale | $15-25/hr human reviewers | Automated pre-screening |
+| Medical/legal AI verification | Domain expert review ($100+/hr) | Flagging high-risk outputs |
+| News fact-checking | Hours per article | Real-time verification |
+| Enterprise AI deployment | Manual QA pipelines | Continuous output monitoring |
+
+**Key metrics**: 3 difficulty levels, dense per-step rewards, exploit-proof grading with annotation deduplication, combined Jaccard+LCS span matching.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -102,7 +118,7 @@ Agent                     Environment
 
 ---
 
-## 📐 Action & Observation Spaces
+## Action & Observation Spaces
 
 ### Action Space (`HallucinationAction`)
 
@@ -133,7 +149,7 @@ Agent                     Environment
 
 ---
 
-## 📋 Tasks
+## Tasks
 
 ### Task 1 — Easy: Simple Factual Error (`task_easy_factual`)
 
@@ -158,26 +174,31 @@ Agent                     Environment
 
 ---
 
-## 🎁 Reward Design
+## Reward Design
 
 Rewards are **dense and partial-progress** — not binary end-of-episode:
 
 | Action | Correct | Incorrect |
 |---|---|---|
-| `detect` | +0.30 | −0.15 |
-| `detect` + correct span | +0.20 × overlap | — |
-| `classify` | +0.30 | −0.10 |
-| `correct` | +0.20 × similarity | — |
-| `noop` (when hallucinations exist) | — | −0.05 |
-| Repeated action (3× in a row) | — | −0.05 |
+| `detect` | +0.30 | -0.15 |
+| `detect` + correct span | +0.20 x overlap | — |
+| `classify` | +0.30 | -0.10 |
+| `correct` | +0.20 x similarity | — |
+| `submit` (early finish) | +0.10 x efficiency | — |
+| `noop` (when hallucinations exist) | — | -0.05 |
+| Repeated action (3x identical) | — | -0.05 |
+
+**Anti-exploitation**: Each annotation can only be rewarded once per action type (detect/classify/correct). Span matching uses combined Jaccard + LCS similarity to prevent bag-of-words gaming.
 
 **Max score per hallucination**: 1.0 (detect + span + classify + correct)
 
 **Grader normalisation**: `score = clamp(cumulative_reward / num_annotations, 0, 1)`
 
+See [Reward Design Documentation](documentation/reward_design.md) for full details.
+
 ---
 
-## 🚀 Setup & Usage
+## Setup & Usage
 
 ### Prerequisites
 
@@ -307,7 +328,7 @@ python inference.py
 
 ---
 
-## 🚢 Deployment (OpenEnv Push)
+## Deployment (OpenEnv Push)
 
 This environment is designed for one-command deployment to **Hugging Face Spaces** via the OpenEnv CLI.
 
@@ -366,9 +387,9 @@ openenv push --repo-id williyam/hallucination-detector-gym --exclude .hfignore
 
 ---
 
-## 📊 Baseline Scores
+## Baseline Scores
 
-Scores are from the baseline inference agent using Llama-3.3-70B-Instruct:
+Scores are from the baseline inference agent using Llama-3.3-70B-Instruct (12 max steps):
 
 | Task | Difficulty | Score | Steps |
 |---|---|---|---|
@@ -381,7 +402,7 @@ Scores are from the baseline inference agent using Llama-3.3-70B-Instruct:
 
 ---
 
-## 🏆 Training Results — GRPO Fine-Tuning
+## Training Results — GRPO Fine-Tuning
 
 We fine-tuned **Qwen3-0.6B** using **GRPO (Group Relative Policy Optimization)** from the TRL library to improve hallucination detection performance.
 
@@ -451,51 +472,53 @@ The GRPO-fine-tuned LoRA adapter is published on Hugging Face:
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 hallucination-detector-gym/
-├── openenv.yaml                          # OpenEnv manifest
+├── openenv.yaml                          # OpenEnv manifest (spec v1)
 ├── pyproject.toml                        # Python package config (uv/pip)
 ├── uv.lock                              # Deterministic dependency lock
 ├── Dockerfile                            # OpenEnv-compatible multi-stage build
 ├── docker-compose.yml                    # Single-command local startup
 ├── .env.example                          # Environment variable template
-├── .env                                  # Local secrets (gitignored)
-├── .dockerignore
-├── .gitignore
-├── inference.py                          # Baseline inference script
+├── inference.py                          # Baseline inference script ([START]/[STEP]/[END] logs)
 ├── client.py                             # OpenEnv EnvClient wrapper
 ├── README.md                             # This file
-├── training_hallucination_detector.ipynb # 🏋️ GRPO fine-tuning notebook
+├── training_hallucination_detector.ipynb # GRPO fine-tuning notebook
 ├── training_results.json                 # Training metrics & scores
-├── model_card.md                         # HuggingFace model card
+│
+├── documentation/                        # Detailed documentation
+│   ├── architecture.md                   # System design & component diagram
+│   ├── api_reference.md                  # REST + WebSocket API docs
+│   └── reward_design.md                  # Reward function design & anti-exploit
 │
 ├── assets/                               # Training plots & images
-│   ├── training_results.png              # Before/after score comparison
-│   ├── training_loss.png                 # GRPO training loss curve
-│   └── score_heatmap.png                 # Baseline vs GRPO heatmap
+│   ├── training_results.png
+│   ├── training_loss.png
+│   └── score_heatmap.png
 │
 ├── grpo_output/                          # GRPO training outputs
 │   └── final/                            # LoRA adapter weights
 │
 ├── hallucination_detector_gym/           # Core library
 │   ├── __init__.py                       # Package exports
+│   ├── py.typed                          # PEP 561 type-checking marker
 │   ├── constants.py                      # Enums, config, reward weights
 │   ├── models.py                         # Pydantic Action/Observation/State
 │   ├── tasks.py                          # Task definitions + annotations
-│   ├── rewards.py                        # Dense reward engine
+│   ├── rewards.py                        # Dense reward engine (exploit-proof)
 │   ├── graders.py                        # Deterministic graders (0.0→1.0)
-│   └── logging_config.py                # Structured logging setup
+│   └── logging_config.py                 # Structured logging setup
 │
 ├── server/                               # OpenEnv server
 │   ├── __init__.py
 │   ├── app.py                            # FastAPI application (OpenEnv create_app)
-│   ├── gradio_builder.py                 # Custom Gradio web UI (replaces generic UI)
+│   ├── gradio_builder.py                 # Custom Gradio web UI
 │   ├── hallucination_environment.py      # Environment implementation
 │   └── requirements.txt                  # Server dependencies
 │
-└── tests/                                # Test suite (41 tests)
+└── tests/                                # Test suite
     ├── __init__.py
     ├── test_environment.py               # Unit tests (models, rewards, graders, tasks)
     └── test_server.py                    # Integration tests (HTTP + WebSocket)
