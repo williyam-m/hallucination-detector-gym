@@ -11,7 +11,11 @@ from hallucination_detector_gym.models import (
     HallucinationObservation,
     HallucinationState,
 )
-from client import HallucinationDetectorEnv
+
+try:
+    from client import HallucinationDetectorEnv
+except (ImportError, ModuleNotFoundError):
+    HallucinationDetectorEnv = None  # type: ignore[assignment,misc]
 
 __all__ = [
     "HallucinationAction",

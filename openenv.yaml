@@ -1,6 +1,29 @@
 spec_version: 1
 name: hallucination_detector_gym
+version: 1.0.0
 type: space
 runtime: fastapi
 app: server.app:app
 port: 8000
+description: >
+  An OpenEnv RL environment where AI agents learn to detect, classify, and
+  correct hallucinations in LLM-generated text. Covers factual errors,
+  entity fabrication, and logical inconsistencies across 3 difficulty levels.
+tags:
+  - openenv
+  - reinforcement-learning
+  - hallucination-detection
+  - ai-safety
+  - llm
+  - pytorch
+  - meta
+tasks:
+  - id: task_easy_factual
+    difficulty: easy
+    description: Single factual error detection in a short biographical passage.
+  - id: task_medium_entity
+    difficulty: medium
+    description: Entity fabrication and factual error detection in a research summary.
+  - id: task_hard_multi
+    difficulty: hard
+    description: Multi-type hallucination detection with factual, fabrication, and logical errors.

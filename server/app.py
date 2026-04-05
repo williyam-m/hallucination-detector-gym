@@ -40,18 +40,11 @@ except Exception as e:  # pragma: no cover
         "    uv sync\n'"
     ) from e
 
-try:
-    from hallucination_detector_gym.models import (
-        HallucinationAction,
-        HallucinationObservation,
-    )
-    from server.hallucination_environment import HallucinationDetectorEnvironment
-except ModuleNotFoundError:  # pragma: no cover
-    from hallucination_detector_gym.models import (
-        HallucinationAction,
-        HallucinationObservation,
-    )
-    from server.hallucination_environment import HallucinationDetectorEnvironment
+from hallucination_detector_gym.models import (
+    HallucinationAction,
+    HallucinationObservation,
+)
+from server.hallucination_environment import HallucinationDetectorEnvironment
 
 from hallucination_detector_gym.logging_config import configure_logging
 
