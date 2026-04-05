@@ -12,6 +12,12 @@ MANDATORY
   directory of the project.
 - Participants must use OpenAI Client for all LLM calls using above variables.
 
+STDOUT FORMAT
+- The script emits exactly three line types to stdout:
+    [START] task=<task_name> env=<benchmark> model=<model_name>
+    [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+    [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
+
 This script runs a baseline LLM agent against all 3 tasks in the Hallucination
 Detector Gym environment. It communicates with the environment via WebSocket
 for stateful multi-step episodes and uses the OpenAI-compatible chat completion
@@ -42,9 +48,12 @@ MODEL_NAME: str = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 ENV_BASE_URL: str = os.getenv("ENV_BASE_URL", "http://localhost:8000")
 
 # Agent configuration
-MAX_STEPS: int = 8
+MAX_STEPS: int = 10
 TEMPERATURE: float = 0.1
 MAX_TOKENS: int = 800
+
+# Benchmark name for structured logging
+BENCHMARK: str = "hallucination_detector_gym"
 
 # Task IDs matching the environment
 TASK_IDS: List[str] = [
@@ -52,6 +61,33 @@ TASK_IDS: List[str] = [
     "task_medium_entity",
     "task_hard_multi",
 ]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Mandatory structured stdout logging: [START], [STEP], [END]
+# ──────────────────────────────────────────────────────────────────────────────
+def log_start(task: str, env: str, model: str) -> None:
+    """Emit [START] line at episode begin."""
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+    """Emit [STEP] line immediately after env.step() returns."""
+    error_val = error if error else "null"
+    done_val = str(done).lower()
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    """Emit [END] line after episode completion (always emitted, even on error)."""
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
+        flush=True,
+    )
 
 # ──────────────────────────────────────────────────────────────────────────────
 # System prompt for the hallucination detector agent
@@ -217,6 +253,8 @@ def build_user_prompt(observation: Dict[str, Any], step_num: int) -> str:
 def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
     """Run the agent on a single task via WebSocket for stateful interaction.
 
+    Emits mandatory [START], [STEP], [END] structured logs to stdout.
+
     Args:
         client: OpenAI client instance.
         task_id: The task to run.
@@ -226,10 +264,6 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
     """
     import websocket
 
-    print(f"\n{'='*60}")
-    print(f"  Task: {task_id}")
-    print(f"{'='*60}")
-
     # Build WebSocket URL from HTTP URL
     ws_url = ENV_BASE_URL.replace("http://", "ws://").replace("https://", "wss://")
     ws_url = f"{ws_url}/ws"
@@ -237,7 +271,12 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
     ws = websocket.create_connection(ws_url, timeout=30)
 
     trajectory: List[Dict[str, Any]] = []
+    rewards: List[float] = []
     final_score: Optional[float] = None
+    steps_taken = 0
+    success = False
+
+    log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     try:
         # Reset environment
@@ -247,7 +286,6 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
 
         for step_num in range(1, MAX_STEPS + 1):
             if done:
-                print(f"  Episode done at step {step_num - 1}.")
                 break
 
             user_prompt = build_user_prompt(obs_data, step_num)
@@ -267,29 +305,38 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
                 )
                 response_text = completion.choices[0].message.content or ""
             except Exception as exc:
-                print(f"  Model request failed: {exc}")
                 response_text = '{"action_type": "noop", "reasoning": "Model request failed"}'
 
             action = parse_action_from_response(response_text)
             action_type = action.get("action_type", "noop")
 
-            print(f"  Step {step_num}: {action_type}", end="")
-            if action.get("hallucinated_span"):
-                span_preview = action["hallucinated_span"][:50]
-                print(f" | span='{span_preview}...'", end="")
-            print()
-
             # Send action to environment via WebSocket
+            step_error: Optional[str] = None
             try:
                 obs_data = env_step_ws(ws, action)
             except Exception as exc:
-                print(f"  Step failed: {exc}")
+                step_error = str(exc)
+                log_step(step=step_num, action=action_type, reward=0.0, done=False, error=step_error)
+                rewards.append(0.0)
+                steps_taken = step_num
                 break
 
             obs = obs_data.get("observation", obs_data)
             reward = obs_data.get("reward", obs.get("reward", 0.0))
             done = obs_data.get("done", obs.get("done", False))
             feedback = obs.get("step_feedback", "")
+
+            rewards.append(reward)
+            steps_taken = step_num
+
+            # Emit mandatory [STEP] log
+            log_step(
+                step=step_num,
+                action=action_type,
+                reward=reward,
+                done=done,
+                error=step_error,
+            )
 
             trajectory.append({
                 "step": step_num,
@@ -299,26 +346,43 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
                 "feedback": feedback,
             })
 
-            print(f"         reward={reward:+.3f} | done={done}")
-            if feedback:
-                print(f"         feedback: {feedback[:100]}")
-
             # Extract grader score if episode is done
             metadata = obs.get("metadata", {})
             if done and metadata.get("grader_score") is not None:
                 final_score = metadata["grader_score"]
 
         if not done:
-            print(f"  Reached max steps ({MAX_STEPS}). Submitting...")
             try:
                 submit_data = env_step_ws(ws, {"action_type": "submit"})
                 submit_obs = submit_data.get("observation", submit_data)
+                submit_reward = submit_data.get("reward", submit_obs.get("reward", 0.0))
+                rewards.append(submit_reward)
+                steps_taken += 1
                 metadata = submit_obs.get("metadata", {})
                 if metadata.get("grader_score") is not None:
                     final_score = metadata["grader_score"]
+                log_step(
+                    step=steps_taken, action="submit",
+                    reward=submit_reward, done=True, error=None,
+                )
             except Exception as exc:
-                print(f"  Submit failed: {exc}")
+                log_step(
+                    step=steps_taken + 1, action="submit",
+                    reward=0.0, done=True, error=str(exc),
+                )
 
+    except Exception as exc:
+        # Ensure [END] is always emitted even on unexpected errors
+        if final_score is None:
+            final_score = 0.0
+        log_end(success=False, steps=steps_taken, score=final_score, rewards=rewards)
+        ws.close()
+        return {
+            "task_id": task_id,
+            "score": final_score,
+            "num_steps": steps_taken,
+            "trajectory": trajectory,
+        }
     finally:
         ws.close()
 
@@ -330,7 +394,11 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
         else:
             final_score = 0.0
 
-    print(f"\n  Final Score: {final_score:.4f}")
+    final_score = max(0.0, min(1.0, final_score))
+    success = final_score > 0.0
+
+    # Emit mandatory [END] log
+    log_end(success=success, steps=steps_taken, score=final_score, rewards=rewards)
 
     return {
         "task_id": task_id,
@@ -342,18 +410,8 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
 
 def main() -> None:
     """Run the baseline inference across all 3 tasks."""
-    print("=" * 60)
-    print("  Hallucination Detector Gym — Baseline Inference")
-    print("=" * 60)
-    print(f"  API Base URL:  {API_BASE_URL}")
-    print(f"  Model:         {MODEL_NAME}")
-    print(f"  Env URL:       {ENV_BASE_URL}")
-    print(f"  Max Steps:     {MAX_STEPS}")
-    print()
-
     if not API_KEY:
-        print("WARNING: No API key found. Set HF_TOKEN or API_KEY env var.")
-        print("Continuing — the model endpoint may reject requests.\n")
+        print("WARNING: No API key found. Set HF_TOKEN or API_KEY env var.", flush=True)
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
@@ -366,25 +424,10 @@ def main() -> None:
 
     elapsed = time.time() - start_time
 
-    # ── Summary ──────────────────────────────────────────────────────────────
-    print("\n" + "=" * 60)
-    print("  BASELINE RESULTS SUMMARY")
-    print("=" * 60)
-    print(f"{'Task':<30} {'Score':>8} {'Steps':>8}")
-    print("-" * 50)
-
-    total_score = 0.0
-    for r in results:
-        print(f"{r['task_id']:<30} {r['score']:>8.4f} {r['num_steps']:>8d}")
-        total_score += r["score"]
-
-    avg_score = total_score / len(results) if results else 0.0
-    print("-" * 50)
-    print(f"{'Average':<30} {avg_score:>8.4f}")
-    print(f"\nTotal time: {elapsed:.1f}s")
-    print("=" * 60)
-
     # Write results to file for reproducibility
+    total_score = sum(r["score"] for r in results)
+    avg_score = total_score / len(results) if results else 0.0
+
     results_output = {
         "model": MODEL_NAME,
         "api_base_url": API_BASE_URL,
@@ -401,10 +444,9 @@ def main() -> None:
         ],
     }
 
-    output_path = "baseline_results.json"
+    output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "baseline_results.json")
     with open(output_path, "w") as f:
         json.dump(results_output, f, indent=2)
-    print(f"\nResults saved to {output_path}")
 
 
 if __name__ == "__main__":
