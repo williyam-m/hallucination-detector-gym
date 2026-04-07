@@ -124,7 +124,7 @@ def _build_app():
     async def web_root_no_slash():
         return RedirectResponse(url="/web/")
 
-    @fastapi_app.get("/web/metadata")
+    @fastapi_app.get("/web/metadata", include_in_schema=False)
     async def web_metadata():
         return web_manager.metadata.model_dump()
 
@@ -137,11 +137,11 @@ def _build_app():
         except WebSocketDisconnect:
             await web_manager.disconnect_websocket(websocket)
 
-    @fastapi_app.post("/web/reset")
+    @fastapi_app.post("/web/reset", include_in_schema=False)
     async def web_reset(request: Optional[Dict[str, Any]] = Body(default=None)):
         return await web_manager.reset_environment(request)
 
-    @fastapi_app.post("/web/step")
+    @fastapi_app.post("/web/step", include_in_schema=False)
     async def web_step(request: Dict[str, Any]):
         if "message" in request:
             action_data = {"message": request["message"]}
@@ -149,7 +149,7 @@ def _build_app():
             action_data = request.get("action", {})
         return await web_manager.step_environment(action_data)
 
-    @fastapi_app.get("/web/state")
+    @fastapi_app.get("/web/state", include_in_schema=False)
     async def web_state():
         return web_manager.get_state()
 

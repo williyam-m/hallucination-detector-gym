@@ -204,10 +204,10 @@ class TestRewardEngine:
         assert abs(engine.cumulative_reward - (r1 + r2)) < 1e-6
 
     def test_final_score_in_range(self) -> None:
-        """Final score must be in [0, 1]."""
+        """Final score must be in (0, 1) strictly."""
         engine = RewardEngine(TASK_EASY)
         score = engine.get_final_score()
-        assert 0.0 <= score <= 1.0
+        assert 0.0 < score < 1.0
 
     def test_span_overlap_ratio_identical(self) -> None:
         """Identical spans should have overlap 1.0."""
@@ -231,7 +231,7 @@ class TestGrader:
     """Tests for the task grader."""
 
     def test_grader_score_in_range(self) -> None:
-        """Grader must return score in [0.0, 1.0]."""
+        """Grader must return score strictly between 0 and 1."""
         grader = TaskGrader(TaskID.TASK_EASY)
         actions = [
             HallucinationAction(
@@ -241,7 +241,7 @@ class TestGrader:
             HallucinationAction(action_type=ActionType.SUBMIT),
         ]
         score = grader.grade(actions)
-        assert 0.0 <= score <= 1.0
+        assert 0.0 < score < 1.0
 
     def test_perfect_easy_task_high_score(self) -> None:
         """Perfect actions on easy task should yield high score."""
@@ -267,11 +267,11 @@ class TestGrader:
         score = grader.grade(actions)
         assert score > 0.7
 
-    def test_empty_actions_score_zero(self) -> None:
-        """No actions should produce score 0."""
+    def test_empty_actions_score_minimum(self) -> None:
+        """No actions should produce minimum score (not zero)."""
         grader = TaskGrader(TaskID.TASK_EASY)
         score = grader.grade([])
-        assert score == 0.0
+        assert score == 0.001
 
     def test_all_wrong_low_score(self) -> None:
         """All wrong actions should yield low score."""
@@ -321,7 +321,7 @@ class TestGrader:
             ),
             HallucinationAction(action_type=ActionType.SUBMIT),
         ])
-        assert 0.0 <= score <= 1.0
+        assert 0.0 < score < 1.0
 
     def test_hard_task_grading(self) -> None:
         """Hard task should be gradable."""
@@ -334,7 +334,7 @@ class TestGrader:
             ),
             HallucinationAction(action_type=ActionType.SUBMIT),
         ])
-        assert 0.0 <= score <= 1.0
+        assert 0.0 < score < 1.0
 
 
 # ──────────────────────────────────────────────────────────────────────────────

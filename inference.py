@@ -52,6 +52,10 @@ MAX_STEPS: int = 10
 TEMPERATURE: float = 0.1
 MAX_TOKENS: int = 800
 
+# Score bounds matching environment grader (strict open interval)
+_SCORE_MIN: float = 0.001
+_SCORE_MAX: float = 0.999
+
 # Benchmark name for structured logging
 BENCHMARK: str = "hallucination_detector_gym"
 
@@ -390,11 +394,11 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
     if final_score is None:
         cumulative = obs.get("cumulative_reward", 0.0)
         if cumulative is not None:
-            final_score = max(0.0, min(1.0, cumulative))
+            final_score = max(_SCORE_MIN, min(_SCORE_MAX, cumulative))
         else:
-            final_score = 0.0
+            final_score = _SCORE_MIN
 
-    final_score = max(0.0, min(1.0, final_score))
+    final_score = max(_SCORE_MIN, min(_SCORE_MAX, final_score))
     success = final_score > 0.0
 
     # Emit mandatory [END] log

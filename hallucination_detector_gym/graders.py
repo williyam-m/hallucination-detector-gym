@@ -2,7 +2,8 @@
 Hallucination Detector Gym — Task Graders.
 
 Programmatic graders that score agent performance on each task.
-Scores range from 0.0 to 1.0 with deterministic, reproducible criteria.
+Scores are strictly between 0 and 1 (exclusive) with deterministic,
+reproducible criteria.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ class TaskGrader:
     """Deterministic grader for a single task.
 
     Runs through a sequence of agent actions and produces a normalised
-    score in [0.0, 1.0].
+    score strictly between 0 and 1 (exclusive).
     """
 
     def __init__(self, task_id: TaskID) -> None:
@@ -46,7 +47,7 @@ class TaskGrader:
             actions: Ordered list of actions the agent took during the episode.
 
         Returns:
-            A score in [0.0, 1.0].
+            A score strictly between GRADER_SCORE_MIN and GRADER_SCORE_MAX.
         """
         engine = RewardEngine(self._task)
 
@@ -79,7 +80,7 @@ def grade_all_tasks(
         actions_per_task: Mapping from TaskID to the list of actions taken.
 
     Returns:
-        Mapping from TaskID to score in [0.0, 1.0].
+        Mapping from TaskID to score strictly between 0 and 1.
     """
     results: dict[TaskID, float] = {}
     for task_id, actions in actions_per_task.items():

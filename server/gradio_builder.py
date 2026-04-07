@@ -153,12 +153,14 @@ def build_hallucination_gradio_app(
 
     # ── Callbacks ────────────────────────────────────────────────────────
 
-    async def reset_env():
+    async def reset_env(task_choice: str | None = None):
         """Reset the environment and return formatted observation."""
         try:
-            data = await web_manager.reset_environment()
+            request_data = {"task_id": task_choice} if task_choice else None
+            data = await web_manager.reset_environment(request_data)
             obs_md = _format_hallucination_observation(data)
-            return obs_md, json.dumps(data, indent=2), "Environment reset. Analyse the passage."
+            label = task_choice or "default (easy)"
+            return obs_md, json.dumps(data, indent=2), f"Environment reset with task: {label}."
         except Exception as e:
             return "", "", f"Error: {e}"
 
@@ -286,6 +288,18 @@ def build_hallucination_gradio_app(
                         step_inputs.append(inp)
 
                 with gr.Row():
+                    task_dropdown = gr.Dropdown(
+                        choices=[
+                            ("Easy — Simple Factual Error", "task_easy_factual"),
+                            ("Medium — Entity Fabrication + Factual", "task_medium_entity"),
+                            ("Hard — Multi-type Detection", "task_hard_multi"),
+                        ],
+                        value="task_easy_factual",
+                        label="Task",
+                        info="Select the task to load on Reset",
+                    )
+
+                with gr.Row():
                     step_btn = gr.Button("Step", variant="primary")
                     reset_btn = gr.Button("Reset", variant="secondary")
                     state_btn = gr.Button("State", variant="secondary")
@@ -302,6 +316,7 @@ def build_hallucination_gradio_app(
         # ── Event bindings ───────────────────────────────────────────────
         reset_btn.click(
             fn=reset_env,
+            inputs=[task_dropdown],
             outputs=[obs_display, raw_json, status],
         )
         step_btn.click(

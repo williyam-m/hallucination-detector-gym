@@ -40,9 +40,9 @@ PENALTY_REPEATED_ACTION: Final[float] = -0.05
 # Step efficiency bonus (awarded at submit for finishing early)
 BONUS_STEP_EFFICIENCY: Final[float] = 0.10
 
-# Grader score bounds
-GRADER_SCORE_MIN: Final[float] = 0.0
-GRADER_SCORE_MAX: Final[float] = 1.0
+# Grader score bounds (strict open interval — never exactly 0 or 1)
+GRADER_SCORE_MIN: Final[float] = 0.001
+GRADER_SCORE_MAX: Final[float] = 0.999
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -20,6 +20,8 @@ from typing import List, Optional
 
 from .constants import (
     ActionType,
+    GRADER_SCORE_MAX,
+    GRADER_SCORE_MIN,
     HallucinationType,
     MAX_STEPS_PER_EPISODE,
     BONUS_STEP_EFFICIENCY,
@@ -416,17 +418,18 @@ class RewardEngine:
         return reward, feedback_parts
 
     def get_final_score(self) -> float:
-        """Compute a normalised final score in [0, 1] for grading.
+        """Compute a normalised final score in (0, 1) for grading.
 
         Returns:
-            Score between 0.0 and 1.0.
+            Score strictly between GRADER_SCORE_MIN and GRADER_SCORE_MAX.
         """
         num_annotations = len(self._task.annotations)
         if num_annotations == 0:
-            return 1.0 if self._cumulative_reward >= 0 else 0.0
+            return GRADER_SCORE_MAX if self._cumulative_reward >= 0 else GRADER_SCORE_MIN
 
         # Max theoretical reward per annotation:
         # detect(0.3) + span(0.2) + classify(0.3) + correct(0.2) = 1.0
         max_reward = num_annotations * 1.0
         normalised = max(0.0, min(1.0, self._cumulative_reward / max_reward))
-        return round(normalised, 4)
+        clamped = max(GRADER_SCORE_MIN, min(GRADER_SCORE_MAX, normalised))
+        return round(clamped, 4)
