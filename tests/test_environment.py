@@ -271,7 +271,7 @@ class TestGrader:
         """No actions should produce minimum score (not zero)."""
         grader = TaskGrader(TaskID.TASK_EASY)
         score = grader.grade([])
-        assert score == 0.001
+        assert score == 0.01
 
     def test_all_wrong_low_score(self) -> None:
         """All wrong actions should yield low score."""
@@ -335,6 +335,43 @@ class TestGrader:
             HallucinationAction(action_type=ActionType.SUBMIT),
         ])
         assert 0.0 < score < 1.0
+
+    def test_score_never_exactly_zero_or_one(self) -> None:
+        """Scores for ALL tasks must NEVER be exactly 0.0 or 1.0.
+
+        Tests empty actions, all-wrong, and perfect actions for each task.
+        """
+        for task_id in TaskID:
+            grader = TaskGrader(task_id)
+
+            # Empty actions
+            score = grader.grade([])
+            assert 0.0 < score < 1.0, f"{task_id}: empty actions score={score}"
+
+            # Submit-only
+            score = grader.grade([HallucinationAction(action_type=ActionType.SUBMIT)])
+            assert 0.0 < score < 1.0, f"{task_id}: submit-only score={score}"
+
+            # All noops then submit
+            noops = [HallucinationAction(action_type=ActionType.NOOP)] * 10
+            noops.append(HallucinationAction(action_type=ActionType.SUBMIT))
+            score = grader.grade(noops)
+            assert 0.0 < score < 1.0, f"{task_id}: noop-filled score={score}"
+
+    def test_score_2f_format_never_0_or_1(self) -> None:
+        """Scores formatted with .2f must never appear as '0.00' or '1.00'."""
+        for task_id in TaskID:
+            grader = TaskGrader(task_id)
+            for actions in [
+                [],
+                [HallucinationAction(action_type=ActionType.SUBMIT)],
+                [HallucinationAction(action_type=ActionType.NOOP)] * 10
+                + [HallucinationAction(action_type=ActionType.SUBMIT)],
+            ]:
+                score = grader.grade(actions)
+                formatted = f"{score:.2f}"
+                assert formatted != "0.00", f"{task_id}: score={score} formats as 0.00"
+                assert formatted != "1.00", f"{task_id}: score={score} formats as 1.00"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -447,3 +484,22 @@ class TestEnvironmentLifecycle:
 
         obs = env.step(HallucinationAction(action_type=ActionType.SUBMIT))
         assert obs.done is True
+
+    def test_grader_score_in_observation_on_done(self) -> None:
+        """When done=True, grader_score must be set and strictly in (0, 1)."""
+        from server.hallucination_environment import HallucinationDetectorEnvironment
+
+        for task_id_str in ["task_easy_factual", "task_medium_entity", "task_hard_multi"]:
+            env = HallucinationDetectorEnvironment()
+            env.reset(task_id=task_id_str)
+            obs = env.step(HallucinationAction(action_type=ActionType.SUBMIT))
+            assert obs.done is True
+            assert obs.grader_score is not None, f"grader_score None for {task_id_str}"
+            assert 0.0 < obs.grader_score < 1.0, (
+                f"grader_score {obs.grader_score} out of (0,1) for {task_id_str}"
+            )
+            # Also verify .2f formatting doesn't hit 0.00 or 1.00
+            formatted = f"{obs.grader_score:.2f}"
+            assert formatted != "0.00" and formatted != "1.00", (
+                f"grader_score {obs.grader_score} formats as {formatted} for {task_id_str}"
+            )
