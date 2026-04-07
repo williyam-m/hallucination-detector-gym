@@ -53,8 +53,9 @@ TEMPERATURE: float = 0.1
 MAX_TOKENS: int = 800
 
 # Score bounds matching environment grader (strict open interval)
-_SCORE_MIN: float = 0.001
-_SCORE_MAX: float = 0.999
+# Widened to 0.01/0.99 so .2f formatting can't round to 0.00 or 1.00
+_SCORE_MIN: float = 0.01
+_SCORE_MAX: float = 0.99
 
 # Benchmark name for structured logging
 BENCHMARK: str = "hallucination_detector_gym"
@@ -351,9 +352,14 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
             })
 
             # Extract grader score if episode is done
-            metadata = obs.get("metadata", {})
-            if done and metadata.get("grader_score") is not None:
-                final_score = metadata["grader_score"]
+            # grader_score may be at observation level (OpenEnv serialization)
+            # or inside metadata (for backward compat / WebSocket responses)
+            if done:
+                gs = obs.get("grader_score")
+                if gs is None:
+                    gs = (obs.get("metadata") or {}).get("grader_score")
+                if gs is not None:
+                    final_score = gs
 
         if not done:
             try:
@@ -362,9 +368,12 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
                 submit_reward = submit_data.get("reward", submit_obs.get("reward", 0.0))
                 rewards.append(submit_reward)
                 steps_taken += 1
-                metadata = submit_obs.get("metadata", {})
-                if metadata.get("grader_score") is not None:
-                    final_score = metadata["grader_score"]
+                # Extract grader score from submit response
+                gs = submit_obs.get("grader_score")
+                if gs is None:
+                    gs = (submit_obs.get("metadata") or {}).get("grader_score")
+                if gs is not None:
+                    final_score = gs
                 log_step(
                     step=steps_taken, action="submit",
                     reward=submit_reward, done=True, error=None,
@@ -378,7 +387,8 @@ def run_task(client: OpenAI, task_id: str) -> Dict[str, Any]:
     except Exception as exc:
         # Ensure [END] is always emitted even on unexpected errors
         if final_score is None:
-            final_score = 0.0
+            final_score = _SCORE_MIN
+        final_score = max(_SCORE_MIN, min(_SCORE_MAX, final_score))
         log_end(success=False, steps=steps_taken, score=final_score, rewards=rewards)
         ws.close()
         return {
