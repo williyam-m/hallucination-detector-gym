@@ -214,6 +214,11 @@ class HallucinationDetectorEnvironment(Environment):
             done=is_done,
         )
 
+        # Compute grader score only when episode ends
+        final_grader_score = (
+            self._reward_engine.get_final_score() if is_done else None
+        )
+
         return HallucinationObservation(
             done=is_done,
             reward=reward,
@@ -226,8 +231,9 @@ class HallucinationDetectorEnvironment(Environment):
             steps_remaining=max(0, steps_remaining),
             cumulative_reward=self._state.cumulative_reward,
             action_history=list(self._action_history),
+            grader_score=final_grader_score,
             metadata={
-                "grader_score": self._reward_engine.get_final_score() if is_done else None,
+                "grader_score": final_grader_score,
             },
         )
 

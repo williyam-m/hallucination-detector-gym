@@ -242,6 +242,10 @@ class HallucinationObservation(BaseObservation):
         default_factory=list,
         description="Summary of actions taken so far.",
     )
+    grader_score: Optional[float] = Field(
+        default=None,
+        description="Normalised task score strictly in (0, 1). Set when done=True.",
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

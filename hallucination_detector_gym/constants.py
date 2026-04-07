@@ -41,8 +41,9 @@ PENALTY_REPEATED_ACTION: Final[float] = -0.05
 BONUS_STEP_EFFICIENCY: Final[float] = 0.10
 
 # Grader score bounds (strict open interval — never exactly 0 or 1)
-GRADER_SCORE_MIN: Final[float] = 0.001
-GRADER_SCORE_MAX: Final[float] = 0.999
+# Widened to 0.01/0.99 so 2-decimal formatting can't round to 0.00 or 1.00
+GRADER_SCORE_MIN: Final[float] = 0.01
+GRADER_SCORE_MAX: Final[float] = 0.99
 
 
 # ──────────────────────────────────────────────────────────────────────────────
