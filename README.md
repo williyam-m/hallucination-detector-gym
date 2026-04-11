@@ -21,17 +21,21 @@ short_description: OpenEnv RL env for LLM hallucination detection
 
 [![HF Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue)](https://huggingface.co/spaces/williyam/hallucination-detector-gym)
 [![Model](https://img.shields.io/badge/%F0%9F%A4%97%20Model-Qwen3--0.6B-orange)](https://huggingface.co/williyam/hallucination-detector-agent-qwen3-0.6b)
-[![OpenEnv](https://img.shields.io/badge/OpenEnv-compatible-green)](https://github.com/open-env/openenv)
+[![OpenEnv](https://img.shields.io/badge/OpenEnv-compatible-green)](https://github.com/meta-pytorch/OpenEnv)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An **OpenEnv** environment where AI agents learn to detect, classify, and correct hallucinations in LLM-generated text. Built for the [Meta × OpenEnv × Hugging Face × PyTorch Hackathon](https://www.scaler.com/school-of-technology/meta-pytorch-hackathon).
+An **OpenEnv** environment where AI agents learn to detect, classify, and correct hallucinations in LLM-generated text. Built for the Meta PyTorch OpenEnv Hackathon x SST | India AI Hackathon'26.
 
-**Links:**
-- [HF Space (Live Demo)](https://huggingface.co/spaces/williyam/hallucination-detector-gym)
-- [Fine-tuned Qwen3-0.6B Model](https://huggingface.co/williyam/hallucination-detector-agent-qwen3-0.6b)
+## Live
+
+* **HF Space** : [https://huggingface.co/spaces/williyam/hallucination-detector-gym](https://huggingface.co/spaces/williyam/hallucination-detector-gym)
+
+## Fine-Tuned LLM
+* **Qwen3-0.6B (GRPO-Optimized Checkpoint)** : [https://huggingface.co/williyam/hallucination-detector-agent-qwen3-0.6b](https://huggingface.co/williyam/hallucination-detector-agent-qwen3-0.6b)
+
+## Documentation
 - [Architecture Documentation](documentation/architecture.md)
 - [API Reference](documentation/api_reference.md)
 - [Reward Design](documentation/reward_design.md)
