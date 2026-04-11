@@ -30,10 +30,10 @@ An **OpenEnv** environment where AI agents learn to detect, classify, and correc
 
 ## Live
 
-* **HF Space** : [https://huggingface.co/spaces/williyam/hallucination-detector-gym](https://huggingface.co/spaces/williyam/hallucination-detector-gym)
+* **[HF Space](https://huggingface.co/spaces/williyam/hallucination-detector-gym)**
 
 ## Fine-Tuned LLM
-* **Qwen3-0.6B (GRPO-Optimized Checkpoint)** : [https://huggingface.co/williyam/hallucination-detector-agent-qwen3-0.6b](https://huggingface.co/williyam/hallucination-detector-agent-qwen3-0.6b)
+* **[Qwen3-0.6B (GRPO-Optimized Checkpoint)](https://huggingface.co/williyam/hallucination-detector-agent-qwen3-0.6b)**
 
 ## Documentation
 - [Architecture Documentation](documentation/architecture.md)
